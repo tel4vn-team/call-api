@@ -22,12 +22,12 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/gorilla/websocket"
-	"github.com/sirupsen/logrus"
 	"github.com/OpenSIPS/call-api/internal/jsonrpc"
 	"github.com/OpenSIPS/call-api/pkg/cmd"
 	"github.com/OpenSIPS/call-api/pkg/config"
 	"github.com/OpenSIPS/call-api/pkg/proxy"
+	"github.com/gorilla/websocket"
+	"github.com/sirupsen/logrus"
 )
 
 const default_ws_host string = "localhost"
@@ -35,7 +35,7 @@ const default_ws_port int = 5059
 const default_ws_path string = "/call-api"
 
 func IgnoreCheckOrigin(r *http.Request) bool {
-	return true;
+	return true
 }
 
 var upgrader = websocket.Upgrader{
@@ -44,21 +44,21 @@ var upgrader = websocket.Upgrader{
 var Cfg *config.Config
 
 type WSConnection struct {
-	conn *websocket.Conn
+	conn  *websocket.Conn
 	proxy *proxy.Proxy // two-way UDP connection to a SIP proxy
 }
 
 type WSCmdEvent struct {
-	cmd *cmd.Cmd
+	cmd   *cmd.Cmd
 	event *cmd.CmdEvent
 }
 
 func (wsc *WSConnection) ReplyError(error_msg string, jsonrpc_id interface{}) {
 	response := &jsonrpc.JsonRPCResponse{
 		JSONRPC: "2.0",
-		ID: jsonrpc_id,
+		ID:      jsonrpc_id,
 		Error: &jsonrpc.JsonRPCError{
-			Code: 32000,
+			Code:    32000,
 			Message: error_msg,
 		},
 	}
@@ -78,9 +78,9 @@ func (wsc *WSConnection) ReplyError(error_msg string, jsonrpc_id interface{}) {
 func (wsc *WSConnection) ReplyOK(jsonrpc_id interface{}, cmd_id string) {
 	response := &jsonrpc.JsonRPCResponse{
 		JSONRPC: "2.0",
-		ID: jsonrpc_id,
-		Result: &map[string]string {
-			"event": "Started",
+		ID:      jsonrpc_id,
+		Result: &map[string]string{
+			"event":  "Started",
 			"cmd_id": cmd_id,
 		},
 	}
@@ -110,7 +110,7 @@ func (wsc *WSConnection) pollWSConnection(agg chan *WSCmdEvent) {
 			response = jsonrpc.NewNotification(c.Command,
 				&map[string]interface{}{
 					"cmd_id": c.ID,
-					"event": "Ended",
+					"event":  "Ended",
 				},
 			)
 		} else {
@@ -120,14 +120,14 @@ func (wsc *WSConnection) pollWSConnection(agg chan *WSCmdEvent) {
 				response = jsonrpc.NewNotification(c.Command,
 					&map[string]interface{}{
 						"cmd_id": c.ID,
-						"event": "Error",
-						"data": ev.event.Error.Error(),
+						"event":  "Error",
+						"data":   ev.event.Error.Error(),
 					},
 				)
 			} else {
 				body := map[string]interface{}{
 					"cmd_id": c.ID,
-					"event": ev.event.Name,
+					"event":  ev.event.Name,
 				}
 				if ev.event.HasParams() {
 					body["data"] = ev.event.Params
@@ -139,7 +139,7 @@ func (wsc *WSConnection) pollWSConnection(agg chan *WSCmdEvent) {
 		message, err := json.Marshal(response)
 		if err != nil {
 			logrus.Errorf("cmd %s (%s): failed to build JSON notification: %s",
-						  c.Command, c.ID, ev.event)
+				c.Command, c.ID, ev.event)
 			return
 		}
 
@@ -160,7 +160,7 @@ func wsConnection(w http.ResponseWriter, r *http.Request) {
 	wsc := &WSConnection{}
 	wsc.conn, err = upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		logrus.Print("upgrade:", err)
+		logrus.Error("upgrade:", err)
 		return
 	}
 	defer wsc.conn.Close()
@@ -172,6 +172,7 @@ func wsConnection(w http.ResponseWriter, r *http.Request) {
 		logrus.Fatal("could not initialize SIP proxy")
 	}
 
+	isClosed := false
 	agg := make(chan *WSCmdEvent)
 
 	go wsc.pollWSConnection(agg)
@@ -180,6 +181,7 @@ func wsConnection(w http.ResponseWriter, r *http.Request) {
 		_, message, err := wsc.conn.ReadMessage()
 		if err != nil {
 			logrus.Info("read: ", err)
+			isClosed = true
 			break
 		}
 
@@ -220,6 +222,10 @@ func wsConnection(w http.ResponseWriter, r *http.Request) {
 		// we expect to receive at least a close on this command's channel
 		go func(c *cmd.Cmd) {
 			for event := range c.Wait() {
+				if isClosed {
+					logrus.Debug("connection is already closed")
+					return
+				}
 				agg <- &WSCmdEvent{c, event}
 			}
 
