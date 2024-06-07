@@ -1,6 +1,8 @@
 ![Call API](images/logo/call-api-logo.png "Call API")
 # Call API
 
+[![Release Call API](https://github.com/tel4vn-team/call-api/actions/workflows/release.yaml/badge.svg)](https://github.com/tel4vn-team/call-api/actions/workflows/release.yaml)
+
 ----
 
 The Call API is a front-end for SIP Proxies (such as [OpenSIPS](https://opensips.org)), aiming to simplify the management of more advanced SIP call flows.  Combining built-in SIP scenarios (such as the ones from [RFC 5359](https://tools.ietf.org/html/rfc5359)) with real-time notifications as the call commands take place, the API is meant to help VoIP system developers build complex SIP services with ease, altogether while providing live reporting for such services.
