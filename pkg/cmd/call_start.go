@@ -1,4 +1,3 @@
-
 // Copyright (C) 2020 OpenSIPS Solutions
 //
 // Call API is free software: you can redistribute it and/or modify
@@ -21,26 +20,26 @@ import (
 	"fmt"
 	"strings"
 	"time"
-	"github.com/OpenSIPS/call-api/pkg/event"
+
 	"github.com/OpenSIPS/call-api/internal/jsonrpc"
+	"github.com/OpenSIPS/call-api/pkg/event"
 )
 
 type callStartCmd struct {
 	caller, callee, ruri, dlginfo string
-	sub event.Subscription
-	cmd *Cmd
+	sub                           event.Subscription
+	cmd                           *Cmd
 }
 
 func (cs *callStartCmd) callStartEnd() {
 	var byeParams = map[string]string{
-		"method": "BYE",
-		"ruri": cs.ruri,
+		"method":  "BYE",
+		"ruri":    cs.ruri,
 		"headers": cs.dlginfo + "CSeq: 3 BYE\r\n", /* guessing the cseq */
 	}
 	cs.sub.Unsubscribe()
 	cs.cmd.proxy.MICall("t_uac_dlg", &byeParams, nil)
 }
-
 
 func (cs *callStartCmd) callStartNotify(sub event.Subscription, notify *jsonrpc.JsonRPCNotification) {
 
@@ -77,7 +76,7 @@ func (cs *callStartCmd) callStartNotify(sub event.Subscription, notify *jsonrpc.
 		event = "TransferPending"
 	}
 
-	body :=  map[string]interface{}{
+	body := map[string]interface{}{
 		"callid": callid,
 		"caller": cs.caller,
 		"callee": cs.callee,
@@ -103,11 +102,10 @@ func (cs *callStartCmd) callStartTransfer(response *jsonrpc.JsonRPCResponse) {
 	}
 
 	cs.cmd.NotifyEvent("Transferring", map[string]interface{}{
-		"caller": cs.caller,
+		"caller":      cs.caller,
 		"destination": cs.callee,
 	})
 }
-
 
 func (cs *callStartCmd) callStartInitial(response *jsonrpc.JsonRPCResponse) {
 
@@ -133,7 +131,7 @@ func (cs *callStartCmd) callStartInitial(response *jsonrpc.JsonRPCResponse) {
 		return
 	}
 
-	message, err := response.GetString("Message");
+	message, err := response.GetString("Message")
 	if err != nil {
 		cs.cmd.NotifyError(err)
 		return
@@ -152,30 +150,35 @@ func (cs *callStartCmd) callStartInitial(response *jsonrpc.JsonRPCResponse) {
 		"callee": cs.callee,
 	})
 
-	var transferParams = map[string]string{
-		"callid": cs.cmd.ID,
-		"leg": "callee",
-		"destination": cs.callee,
-	}
-
-	var transferFilter = map[string]interface{}{
-		"callid": cs.cmd.ID,
-	}
-
-	/* before transfering, register for new blind transfer events */
-	cs.sub = cs.cmd.proxy.SubscribeFilter("E_CALL_TRANSFER", cs.callStartNotify, transferFilter)
-	if cs.sub == nil {
-		cs.cmd.NotifyNewError("Could not subscribe for event")
-		return
-	}
-
 	time.Sleep(500 * time.Millisecond)
-	err = cs.cmd.proxy.MICall("call_transfer", &transferParams, cs.callStartTransfer)
-	if err != nil {
-		cs.sub.Unsubscribe()
-		cs.cmd.NotifyError(err)
-		return
-	}
+
+	cs.cmd.NotifyEvent("Ended", "")
+	cs.callStartEnd()
+
+	// var transferParams = map[string]string{
+	// 	"callid": cs.cmd.ID,
+	// 	"leg": "callee",
+	// 	"destination": cs.callee,
+	// }
+
+	// var transferFilter = map[string]interface{}{
+	// 	"callid": cs.cmd.ID,
+	// }
+
+	// /* before transfering, register for new blind transfer events */
+	// cs.sub = cs.cmd.proxy.SubscribeFilter("E_CALL_TRANSFER", cs.callStartNotify, transferFilter)
+	// if cs.sub == nil {
+	// 	cs.cmd.NotifyNewError("Could not subscribe for event")
+	// 	return
+	// }
+
+	// time.Sleep(500 * time.Millisecond)
+	// err = cs.cmd.proxy.MICall("call_transfer", &transferParams, cs.callStartTransfer)
+	// if err != nil {
+	// 	cs.sub.Unsubscribe()
+	// 	cs.cmd.NotifyError(err)
+	// 	return
+	// }
 }
 
 func (c *Cmd) CallStart(params map[string]interface{}) {
@@ -209,10 +212,10 @@ func (c *Cmd) CallStart(params map[string]interface{}) {
 	headers := fmt.Sprintf(headersFormat, caller, callee, caller, c.ID)
 
 	var inviteParams = map[string]string{
-		"method": "INVITE",
-		"ruri": caller,
+		"method":  "INVITE",
+		"ruri":    caller,
 		"headers": headers,
-		"body": inviteBody,
+		"body":    inviteBody,
 	}
 	var next_hop = c.proxy.GetURI()
 	if next_hop != "" {
@@ -220,11 +223,11 @@ func (c *Cmd) CallStart(params map[string]interface{}) {
 	}
 
 	cs := &callStartCmd{
-		caller: caller,
-		callee: callee,
-		ruri: caller,
+		caller:  caller,
+		callee:  callee,
+		ruri:    caller,
 		dlginfo: "",
-		cmd: c,
+		cmd:     c,
 	}
 
 	err := c.proxy.MICall("t_uac_dlg", &inviteParams, cs.callStartInitial)
