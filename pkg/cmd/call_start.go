@@ -37,7 +37,7 @@ func (cs *callStartCmd) callStartEnd() {
 		"ruri":    cs.ruri,
 		"headers": cs.dlginfo + "CSeq: 3 BYE\r\n", /* guessing the cseq */
 	}
-	cs.sub.Unsubscribe()
+	// cs.sub.Unsubscribe()
 	cs.cmd.proxy.MICall("t_uac_dlg", &byeParams, nil)
 }
 
@@ -149,7 +149,7 @@ func (cs *callStartCmd) callStartInitial(response *jsonrpc.JsonRPCResponse) {
 		"caller": cs.caller,
 		"callee": cs.callee,
 	})
-
+	// Đã nhận được 200 OK, chờ 500ms rồi gửi BYE
 	time.Sleep(500 * time.Millisecond)
 
 	cs.cmd.NotifyEvent("Ended", "")
@@ -195,7 +195,8 @@ func (c *Cmd) CallStart(params map[string]interface{}) {
 		"s=session\r\n" +
 		"c=IN IP4 0.0.0.0\r\n" +
 		"t=0 0\r\n" +
-		"m=audio 9 RTP/AVP 0\r\n" +
+		"m=audio 10100 RTP/AVP 8 0\r\n" +
+		"a=rtpmap:8 PCMA/8000\r\n" +
 		"a=rtpmap:0 PCMU/8000\r\n"
 
 	caller, ok := params["caller"].(string)
@@ -213,7 +214,7 @@ func (c *Cmd) CallStart(params map[string]interface{}) {
 
 	var inviteParams = map[string]string{
 		"method":  "INVITE",
-		"ruri":    caller,
+		"ruri":    callee,
 		"headers": headers,
 		"body":    inviteBody,
 	}
@@ -225,7 +226,7 @@ func (c *Cmd) CallStart(params map[string]interface{}) {
 	cs := &callStartCmd{
 		caller:  caller,
 		callee:  callee,
-		ruri:    caller,
+		ruri:    callee,
 		dlginfo: "",
 		cmd:     c,
 	}
